@@ -1,0 +1,302 @@
+GEOPM - Global Extensible Open Power Manager
+===================================================
+
+DISCLAIMER
+----------
+SEE COPYING FILE FOR LICENSE INFORMATION.
+
+LAST UPDATE
+-----------
+2016 November 11
+
+Christopher Cantalupo <christopher.m.cantalupo@intel.com> <br>
+Steve Sylvester <steve.s.sylvester@intel.com>
+
+WEB PAGE
+--------
+http://geopm.github.io/geopm
+
+SUMMARY
+-------
+Global Extensible Open Power Manager (GEOPM) is an extensible power
+management framework targeting high performance computing.  The library can be
+extended to support new control algorithms and new hardware power management
+features.  The GEOPM package provides built in features ranging from static
+management of power policy for each individual compute node, to dynamic
+coordination of power policy and performance across all of the compute nodes
+hosting one MPI job on a portion of a distributed computing system.  The
+dynamic coordination is implemented as a hierarchical control system for
+scalable communication and decentralized control.  The hierarchical control
+system can optimize for various objective functions including maximizing
+global application performance within a power bound.  The root of the control
+hierarchy tree can communicate through shared memory with the system resource
+management daemon to extend the hierarchy above the individual MPI job level
+and enable management of system power resources for multiple MPI jobs and
+multiple users by the system resource manager.  The geopm package provides the
+libgeopm library, the libgeopmpolicy library, the geopmctl application and the
+geopmpolicy application.  The libgeopm library can be called within MPI
+applications to enable application feedback for informing the control
+decisions.  If modification of the target application is not desired then the
+geopmctl application can be run concurrently with the target application.  In
+this case, target application feedback is inferred by querying the hardware
+through Model Specific Registers (MSRs).  With either method (libgeopm or
+geopmctl), the control hierarchy tree writes processor power policy through
+MSRs to enact policy decisions.  The libgeopmpolicy library is used by a
+resource manager to set energy policy control parameters for MPI jobs.  Some
+features of libgeopmpolicy are available through the geopmpolicy application
+including support for static control.
+
+TRAVIS CI
+---------
+[![Build Status](https://travis-ci.org/geopm/geopm.svg)](https://travis-ci.org/geopm/geopm)
+
+The geopm public github project has been integrated with Travis
+continuous integration.
+
+http://travis-ci.org/geopm/geopm
+
+All pull requests will be built and tested automatically by Travis.
+Additionally, pushes to the public dev and master branches which pass
+testing in Travis will trigger build and test in the OpenSUSE Build
+System (OBS) for a variety of Linux distributions.  These provide yum
+and zypper repositories which can be used to install the geopm
+software.
+
+INSTALL
+-------
+The products of OBS triggered by Travis CI can be installed directly
+on a number of Linux distributions through yum or zypper.  Build and
+test are currently passing on CentOS 7, RHEL 7, SLES 12, SLES 12-1,
+Fedora 21, Fedora 22 and Fedora 23.  Release 0.2.0 is the first to
+include distribution on OBS.  Pushes to the github public master
+branch are done only after a release has been tagged, and these tagged
+releases are published in yum and zypper repositories at the link
+below:
+
+http://download.opensuse.org/repositories/home:/cmcantalupo:/geopm
+
+The tagged releases should be more stable and more accurately
+documented than the tip of the public dev branch which is updated
+frequently.  These frequent pushes to the public development branch
+can also be used as yum and zypper repositories.  These are published
+at the link below:
+
+http://download.opensuse.org/repositories/home:/cmcantalupo:/geopm-dev
+
+Use of these repositories should be helpful for developers of geopm
+who are willing to update the installed version frequently.
+
+### Red Hat
+To install the yum repository follow the commands below.  Select the
+DISTRO appropriate for you system.  Select the BRANCH as "geopm" or
+"geopm-dev" to follow either the "master" or "dev" branches of
+repository hosted at <http://github.com/geopm/geopm>.
+
+    DISTRO=# Select from: "CentOS_7" "RHEL7" "Fedora_21" "Fedora_22" "Fedora_23"
+    BRANCH=# Select from: "geopm" or "geopm-dev"
+    REPO=home:/cmcantalupo:
+    wget http://download.opensuse.org/repositories/${REPO}/${BRANCH}/${DISTRO}/${REPO}${BRANCH}.repo
+    sudo install --mode 644 ${REPO}${BRANCH}.repo /etc/yum.repos.d/${BRANCH}.repo
+    unset DISTRO BRANCH REPO
+
+After the yum repository has been added, you can simply install geopm
+with yum:
+
+    sudo yum install geopm # For headers install geopm-devel
+
+To bring the system up to date with the tip of the public master or
+dev branch on github (depending on which "BRANCH" was selected when
+the yum repository was added:
+
+    sudo yum update geopm # For headers update geopm-devel
+
+### SUSE
+To install the zypper repository follow the commands below.  Select the
+DISTRO appropriate for you system.  Select the BRANCH as "geopm" or
+"geopm-dev" to follow either the "master" or "dev" branches of
+repository hosted at <http://github.com/geopm/geopm>.
+
+    DISTRO=# Select from: "SLES_12" "SLES_12-1"
+    BRANCH=# Select from: "geopm" or "geopm-dev"
+    REPO=home:/cmcantalupo:
+    sudo zypper addrepo http://download.opensuse.org/repositories/${REPO}/${BRANCH}/${DISTRO}/${REPO}${BRANCH}.repo ${BRANCH}
+    sudo zypper refresh
+    unset DISTRO BRANCH REPO
+
+After the zypper repository has been added, you can simply install
+geopm with zypper:
+
+    sudo zypper install geopm # For headers install geopm-devel
+
+To bring the system up to date with the tip of the public master or
+dev branch on github (depending on which "BRANCH" was selected when
+the zypper repository was added:
+
+    sudo zypper update geopm # For headers update geopm-devel
+
+BUILD REQUIREMENTS
+------------------
+In order to build the geopm package from source, the below
+requirements must be met.
+
+The geopm package requires a compiler that supports the MPI 2.2 and C++11
+standards.  These requirements can be met by using GCC version 4.7 or greater
+and installing the openmpi-devel package version 1.7 or greater on RHEL or
+SLES Linux.  Additionally building the geopm package requires the json-c
+library and the hwloc library. Documentation creation including manpages
+further requires the rubygems package, and the ruby-devel package.
+
+RHEL:
+
+    yum install openmpi-devel json-c-devel hwloc-devel ruby-devel rubygems
+
+SUSE:
+
+    zypper install openmpi-devel libjson-c-devel hwloc-devel ruby-devel rubygems
+
+Alternatively these can be installed from source, and an alternate MPI
+implementation to OpenMPI can be selected.  See
+
+    ./configure --help
+
+for details on how to use non-standard install locations for build
+requirements through the
+
+    ./configure --with-<feature>
+
+options.
+
+
+BUILD INSTRUCTIONS
+------------------
+The source code can be rebuilt from the source RPMs available from the
+links in the INSTALL section using rpmbuild.  To build from the git
+repository follow the instructions below.
+
+To build all targets and install it in a "build/geopm" subdirectory of your
+home directory run the following commands:
+
+    ./autogen.sh
+    ./configure --prefix=$HOME/build/geopm
+    make
+    make install
+
+An RPM can be created on a RHEL or SUSE system with the
+
+    make rpm
+
+target.  Note that the --with-mpi-bin option may be required to inform
+configure about the location of the MPI compiler wrappers.  The following
+command may be sufficient to determine the location:
+
+    dirname $(find /usr -name mpicc)
+
+To build in an environment without support for OpenMP (i.e. clang on Mac OS X)
+use the
+
+    ./configure --disable-openmp
+
+option.  The
+
+    ./configure --disable-mpi
+
+option can be used to build only targets which do not require MPI.  By default
+MPI targets are built.
+
+
+RUN REQUIREMENTS
+----------------
+We are targeting SLES12 and RHEL7 distributions for functional runtime
+support.  The msr-safe kernel driver must be loaded at runtime to support user
+level read and write of white-listed MSRs.  The source code for the driver can
+be found here: <https://github.com/scalability-llnl/msr-safe>.
+
+Alternately you can run geopm as root with the standard msr driver loaded:
+
+    modprobe msr
+
+Note that other Linux mechanisms for power management can interfere with
+geopm, and these must be disabled.  We suggest the following:
+
+    echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+
+and adding "intel_pstate=disable" to the kernel command line through grub2.
+
+
+TESTING
+-------
+From within the source code directory, tests can be executed with the
+"make check" target.  Some tests must be run as MPI applications, and
+in order support these tests you must define the "MPIEXEC" environment
+variable to whatever is appropriate for your your MPI runtime (default
+is mpiexec).  The tests assume that this application will respect the
+'-n' flag to set the number of MPI processes.  Note that '-n' is defined
+by the MPI standard.  Each MPI dependent test is run with 16 MPI
+processes.
+
+STATUS
+------
+This software is pre-alpha quality and is provided for collaborative
+purposes.  We are very interested in feedback from the community.  The
+static modes are supported by geopmpolicy and libgeopmpolicy.  The MPI
+runtime support of geopmctl and libgeopm is complete.  Basic profiling
+features like creating reports and traces are complete.  See TODO file
+for more information on forthcoming work.
+
+Test coverage is incomplete.  The line coverage results from gcov as
+reported by gcovr for a recent build are below:
+
+**GCC Code Coverage Report**
+
+**Directories: src, plugin**
+
+File                     |   Lines  |     Exec   |     Cover
+------------------------ | -------- | ---------- | ---------
+CircularBuffer.hpp       |   27     |     25     |     93%
+Controller.cpp           |   462    |     351    |     76%
+Decider.cpp              |   21     |     21     |     100%
+Decider.hpp              |   1      |     1      |     100%
+DeciderFactory.cpp       |   34     |     30     |     88%
+Environment.cpp          |   72     |     62     |     86%
+Exception.cpp            |   127    |     97     |     76%
+Exception.hpp            |   1      |     0      |     0%
+GlobalPolicy.cpp         |   574    |     456    |     79%
+KNLPlatformImp.cpp       |   335    |     245    |     73%
+Platform.cpp             |   148    |     80     |     54%
+PlatformFactory.cpp      |   78     |     63     |     80%
+PlatformImp.cpp          |   224    |     197    |     88%
+PlatformTopology.cpp     |   33     |     29     |     88%
+Policy.cpp               |   130    |     130    |     100%
+PolicyFlags.cpp          |   78     |     67     |     86%
+Profile.cpp              |   431    |     356    |     88%
+ProfileThread.cpp        |   45     |     0      |     0%
+RAPLPlatform.cpp         |   149    |     136    |     91%
+Region.cpp               |   267    |     260    |     97%
+SampleRegulator.cpp      |   77     |     76     |     99%
+SampleScheduler.cpp      |   39     |     35     |     90%
+SharedMemory.cpp         |   101    |     65     |     64%
+SignalHandler.cpp        |   57     |     53     |     93%
+StaticPolicyDecider.cpp  |   13     |     11     |     85%
+StaticPolicyDecider.hpp  |   1      |     1      |     100%
+Tracer.cpp               |   39     |     14     |     36%
+TreeCommunicator.cpp     |   286    |     250    |     87%
+XeonPlatformImp.cpp      |   353    |     245    |     69%
+geopm_ctl_spawn.c        |   2      |     0      |     0%
+geopm_hash.c             |   13     |     13     |     100%
+geopm_hash.h             |   2      |     2      |     100%
+geopm_message.c          |   16     |     8      |     50%
+geopm_omp.c              |   11     |     0      |     0%
+geopm_plugin.c           |   37     |     34     |     92%
+geopm_pmpi.c             |   479    |     105    |     22%
+geopm_time.h             |   19     |     17     |     90%
+geopm_version.c          |   2      |     2      |     100%
+BalancingDecider.cpp     |   102    |     75     |     74%
+BalancingDecider.hpp     |   1      |     1      |     100%
+GoverningDecider.cpp     |   88     |     17     |     19%
+GoverningDecider.hpp     |   1      |     1      |     100%
+TOTAL                    |   4994   |     3631   |     73%
+
+ACKNOWLEDGMENTS
+---------------
+Development of the GEOPM software package has been partially funded
+through contract B609815 with Argonne National Laboratory.

@@ -1,0 +1,269 @@
+geopm_prof_c(3) -- geopm application profiling structure
+========================================================
+
+[//]: # (Copyright (c) 2015, 2016, 2017, Intel Corporation)
+[//]: # ()
+[//]: # (Redistribution and use in source and binary forms, with or without)
+[//]: # (modification, are permitted provided that the following conditions)
+[//]: # (are met:)
+[//]: # ()
+[//]: # (    * Redistributions of source code must retain the above copyright)
+[//]: # (      notice, this list of conditions and the following disclaimer.)
+[//]: # ()
+[//]: # (    * Redistributions in binary form must reproduce the above copyright)
+[//]: # (      notice, this list of conditions and the following disclaimer in)
+[//]: # (      the documentation and/or other materials provided with the)
+[//]: # (      distribution.)
+[//]: # ()
+[//]: # (    * Neither the name of Intel Corporation nor the names of its)
+[//]: # (      contributors may be used to endorse or promote products derived)
+[//]: # (      from this software without specific prior written permission.)
+[//]: # ()
+[//]: # (THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS)
+[//]: # ("AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT)
+[//]: # (LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR)
+[//]: # (A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT)
+[//]: # (OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,)
+[//]: # (SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT)
+[//]: # (LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,)
+[//]: # (DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY)
+[//]: # (THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT)
+[//]: # ((INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY LOG OF THE USE)
+[//]: # (OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.)
+
+## SYNOPSIS
+
+**\#include [<geopm.h>](https://github.com/geopm/geopm/blob/dev/src/geopm.h)**
+
+`Link with -lgeopm`
+
+  * `int geopm_prof_region(`:
+    `const char *`_region_name_, <br>
+    `long` _policy_hint_, <br>
+    `uint64_t *`_region_id_);
+
+  * `int geopm_prof_enter(`:
+    `uint64_t` _region_id_);
+
+  * `int geopm_prof_exit(`:
+    `uint64_t` _region_id_);
+
+  * `int geopm_prof_progress(`:
+    `uint64_t` _region_id_, <br>
+    `double` _fraction_);
+
+  * `int geopm_prof_epoch(`:
+    `void);
+
+  * `int geopm_prof_disable(`:
+    `const char *`_feature_name_);
+
+  * `int geopm_tprof_create(`:
+    `int` _num_thread_, <br>
+    `size_t` _num_iter_, <br>
+    `size_t` _chunk_size_, <br>
+    `struct geopm_tprof_c **`_tprof_);
+
+  * `int geopm_tprof_destroy(`:
+    `struct geopm_tprof_c *`_tprof_);
+
+  * `int geopm_tprof_increment(`:
+    `struct geopm_tprof_c *`_tprof_, <br>
+    `uint64_t` _region_id_, <br>
+    `int` _thread_idx_);
+
+## DESCRIPTION
+The functions described here enable application feedback to the
+control algorithm for identifying regions of code, progress within
+regions, and global synchronization points in the application.
+Regions of code define periods in the application during which control
+parameters are tuned with the expectation that control parameters for
+a region can be optimized independently of other regions.  In this way
+a region is associated with a set of control parameters which can be
+optimized, and future time intervals associated with the same region
+will benefit from the application of control parameters which were
+determined from tuning within previous occurrences of the region.
+There are two competing motivations for defining a region within the
+application.  The first is to identify a section of code that has
+distinct compute, memory or network characteristics.  The second is to
+avoid defining these regions such that they are nested within each
+other, as nested regions are ignored, and only the outer most region
+is used for tuning when nesting occurs.  Identifying progress within a
+region can be used to alleviate load imbalance in the application
+under the assumption that the region is bulk synchronous.  Under the
+assumption that the application employs an iterative algorithm which
+synchronizes periodically the user can alleviate load imbalance on
+larger time scales than the regions provide.  This is done by marking
+the end of the outer most loop, or the "epoch."
+
+  * `geopm_prof_region`():
+    registers an application region.  The _region_name_ and
+    _policy_hint_ are input parameters, and the _region_id_ is output.
+    The _region_id_ can be used with `geopm_prof_enter`(),
+    `geopm_prof_exit`(), `geopm_prof_progress`(), and
+    `geopm_tprof_progress`() to referrence the region.  If the region
+    name has been previously registered, a call to this function will
+    set the _region_id_ but the state associated with the region is
+    unmodified.  The _region_name_ is used to determine the output
+    _region_id_ and is also displayed in the profiling report to
+    identify the region.  The _policy_hint_ is one of the values given
+    by the geopm_prof_hint_e enum defined in _geopm_policy.h_ which
+    determines the initial control settings.  The following hints are
+    supported: `GEOPM_POLICY_HINT_UNKNOWN`,
+    `GEOPM_POLICY_HINT_COMPUTE`, `GEOPM_POLICY_HINT_MEMORY`,
+    `GEOPM_POLICY_HINT_NETWORK`.
+
+  * `geopm_prof_enter`():
+    is called by the compute application to mark the beginning of the
+    profiled compute region associated with the _region_id_. If this
+    call is made after entering a different region, but before exiting
+    that region, the call is ignored and an error code is returned
+    (i.e. nested regions are ignored).
+
+  * `geopm_prof_exit`():
+    is called by the compute application to mark the end of a compute
+    region.  If this region is nested then the call is ignored and an
+    error code is returned.
+
+  * `geopm_prof_progress`():
+    is called by compute application in single threaded context to
+    signal the fractional progress, _fraction_ through the work
+    required to complete the region where _fraction_ is between 0 and 1.
+    If the _region_id_ does not match the _region_id_ of the last
+    call to geopm_prof_prof_enter() which was not nested, then this
+    call is ignored and an error code is returned.
+
+  * `geopm_prof_epoch`():
+    is called once for each pass through the outer most computational
+    loop executed by the application.  This function call should occur
+    exactly once in the application source at the beginning of the loop
+    that encapsulates the primary computational region of the
+    application.
+
+  * `geopm_prof_disable`():
+    is called at application start up to disable a profiling feature.
+    By default all profiling features available on the system are
+    enabled.  The set of all possible values for _feature_name_ are:
+    "instr", "flop", and "joules".  This API is not currently
+    implemented.
+
+  * `geopm_tprof_create`():
+    creates a thread profiling object, _tprof_, which extends the
+    functionality of the profiling interface to report progress within
+    threaded regions.  The interface assumes a fixed number of
+    threads, _num_thread_, which are performing work sharing on a list
+    of tasks _num_iter_ long (e.g. an omp parallel for loop with
+    _num_iter_ loops).  In the specific case of an OpenMP for loop
+    statically scheduled with a chunk size then the _chunk_size_
+    arguement can be specified to be non-zero and the work
+    distribution amung threads is explicitly calculated while the
+    minimum progress of any thread is reported.  In all other
+    threading models _chunk_size_ should be specified to be zero and
+    progress is aggregated and the mean progress is reported.
+
+  * `geopm_tprof_destroy`():
+    releases all resources associated with the _tprof_ object.  The
+    _tprof_ object should be created and destroyed for each process
+    entry into a thread parallel region: the _tprof_ object cannot be
+    reused.
+
+  * `geopm_tprof_increment`():
+    is called after a thread has completed each work unit to report
+    progress.  The _tprof_ thread profiling object is passed as the
+    first argument. The region identifier returned by
+    `geopm_prof_region`() is passed as the second argument,
+    _region_id_.  The last argument is the thread index which is in
+    the range of [0, 1, ..., _num_thread_ - 1] where _num_thread_ is
+    the parameter passed when the _tprof_ was created.  This index
+    uniquely identifies the thread that is reporting progress.  When
+    using the `geopm_tprof_increment`() interface to report progress,
+    it is incorrect to also call the `geopm_prof_progress`()
+    interface for the same region.
+
+## EXAMPLE
+
+    #include <stdlib.h>
+    #include <string.h>
+    #include <errno.h>
+    #include <stdint.h>
+    #include <mpi.h>
+    #include <omp.h>
+
+    #include "geopm.h"
+
+
+    int main(int argc, char **argv)
+    {
+        int chunk_size = 0;
+        int err = 0;
+        int index = 0;
+        int rank = 0;
+        int num_iter = 100000000;
+        double sum = 0.0;
+        struct geopm_tprof_c *tprof = NULL;
+        int num_thread = 0;
+        int thread_idx = 0 ;
+        uint64_t region_id = 0;
+
+        err = MPI_Init(&argc, &argv);
+        if (!err) {
+    #pragma omp parallel
+    {
+            num_thread = omp_get_num_threads();
+    }
+            chunk_size = num_iter / num_thread;
+            if (num_iter % num_thread) {
+                ++chunk_size;
+            }
+            err = geopm_tprof_create(num_thread, num_iter, chunk_size, &tprof);
+        }
+        if (!err) {
+            err = geopm_prof_region("loop_0", GEOPM_POLICY_HINT_UNKNOWN, &region_id);
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
+        if (!err) {
+            err = geopm_prof_enter(region_id);
+        }
+        if (!err) {
+    #pragma omp parallel default(shared) private(thread_idx, index)
+    {
+            thread_idx = omp_get_thread_num();
+    #pragma omp for reduction(+:sum) schedule(static, chunk_size)
+            for (index = 0; index < num_iter; ++index) {
+                sum += (double)index;
+                geopm_tprof_increment(tprof, region_id, thread_idx);
+            }
+    }
+            err = geopm_prof_exit(region_id);
+        }
+        if (!err) {
+            err = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        }
+        if (!err && !rank) {
+            printf("sum = %e\n\n", sum);
+        }
+
+        int tmp_err = MPI_Finalize();
+
+        return err ? err : tmp_err;
+    }
+
+## ERRORS
+All functions described on this man page return an error code.  See
+**geopm_error(3)** for a full description of the error numbers and how
+to convert them to strings.
+
+## COPYRIGHT
+Copyright (C) 2015, 2016, 2017, Intel Corporation. All rights reserved.
+
+## SEE ALSO
+**geopm(7)**,
+**geopm_ctl_c(3)**,
+**geopm_error(3)**,
+**geopm_fortran(3)**,
+**geopm_omp(3)**,
+**geopm_policy_c(3)**,
+**geopmkey(1)**,
+**geopm_version(3)**,
+**geopmctl(1)**,
+**geopmpolicy(1)**

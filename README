@@ -1,0 +1,49 @@
+MPI_Gather + GEOPM issue
+========================
+
+This program built for LLNL's Catalyst machine. 
+
+
+GEOPM build
+-----------
+module purge
+module load gcc/4.9.3 mvapich2/2.2 StdEnv
+./autogen.sh
+CC=mpicc CXX=mpicxx F77=mpif77 ./configure --enable-debug --prefix=$HOME/ex-mpigather-geopm/geopm/build
+make
+make install
+
+
+MPI Gather example build
+------------------------
+make
+
+
+Launching Case 1: Correct output
+--------------------------------
+From login node:
+LD_LIBRARY_PATH=$HOME/ex-mpigather-geopm/geopm/build/lib/:$LD_LIBRARY_PATH OMP_NUM_THREADS=24 srun -N 2 -n 4 --cores-per-socket=12 --ntasks-per-node=2 -ppdebug --mpibind=on --threads-per-core=1 --msr-safe ./prog
+
+--- OUTPUT ---
+My rank ID is 0. There are 4 ranks.
+My rank ID is 1. There are 4 ranks.
+My rank ID is 2. There are 4 ranks.
+My rank ID is 3. There are 4 ranks.
+Receiving rank 0 on catalyst322 CPU 0
+Receiving rank 1 on catalyst322 CPU 12
+Receiving rank 2 on catalyst323 CPU 0
+Receiving rank 3 on catalyst323 CPU 12
+0 1 2 3  // Rank 0 gathered all rank IDs
+
+
+Launching Case 2: Incorrect output
+----------------------------------
+From login node:
+LD_LIBRARY_PATH=$HOME/ex-mpigather-geopm/geopm/build/lib/:$LD_LIBRARY_PATH OMP_NUM_THREADS=24 srun -N 2 -n 4 --cores-per-socket=12 --ntasks-per-node=2 -ppdebug --mpibind=on --threads-per-core=1 --msr-safe ./test.sh 
+
+--- OUTPUT ---
+My rank ID is 0. There are 2 ranks.
+My rank ID is 1. There are 2 ranks.
+Receiving rank 0 on catalyst322 CPU 12
+Receiving rank 1 on catalyst323 CPU 12
+-1403750456 10922  // (Supposed to be) rank IDs

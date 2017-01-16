@@ -1,0 +1,263 @@
+geopm(7) -- global extensible open power manager
+=======================================================
+
+[//]: # (Copyright (c) 2015, 2016, 2017, Intel Corporation)
+[//]: # ()
+[//]: # (Redistribution and use in source and binary forms, with or without)
+[//]: # (modification, are permitted provided that the following conditions)
+[//]: # (are met:)
+[//]: # ()
+[//]: # (    * Redistributions of source code must retain the above copyright)
+[//]: # (      notice, this list of conditions and the following disclaimer.)
+[//]: # ()
+[//]: # (    * Redistributions in binary form must reproduce the above copyright)
+[//]: # (      notice, this list of conditions and the following disclaimer in)
+[//]: # (      the documentation and/or other materials provided with the)
+[//]: # (      distribution.)
+[//]: # ()
+[//]: # (    * Neither the name of Intel Corporation nor the names of its)
+[//]: # (      contributors may be used to endorse or promote products derived)
+[//]: # (      from this software without specific prior written permission.)
+[//]: # ()
+[//]: # (THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS)
+[//]: # ("AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT)
+[//]: # (LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR)
+[//]: # (A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT)
+[//]: # (OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,)
+[//]: # (SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT)
+[//]: # (LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,)
+[//]: # (DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY)
+[//]: # (THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT)
+[//]: # ((INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY LOG OF THE USE)
+[//]: # (OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.)
+
+## DESCRIPTION
+Global Extensible Open Power Manager (GEOPM) is an extensible
+power management framework targeting high performance computing.  The
+library can be extended to support new control algorithms and new
+hardware power management features.  The GEOPM package provides built
+in features ranging from static management of power policy for each
+individual compute node, to dynamic coordination of power policy and
+performance across all of the compute nodes hosting one MPI job on a
+portion of a distributed computing system.  The dynamic coordination
+is implemented as a hierarchical control system for scalable
+communication and decentralized control.  The hierarchical control
+system can optimize for various objective functions including
+maximizing global application performance within a power bound.  The
+root of the control hierarchy tree can communicate through shared
+memory with the system resource management daemon to extend the
+hierarchy above the individual MPI job level and enable management of
+system power resources for multiple MPI jobs and multiple users by the
+system resource manager.  The geopm package provides the libgeopm
+library, the libgeopmpolicy library, the geopmctl application and the
+geopmpolicy application.  The libgeopm library can be called within
+MPI applications to enable application feedback for informing the
+control decisions.  If modification of the target application is not
+desired then the geopmctl application can be run concurrently with the
+target application.  In this case, target application feedback is
+inferred by querying the hardware through Model Specific Registers
+(MSRs).  With either method (libgeopm or geopmctl), the control
+hierarchy tree writes processor power policy through MSRs to enact
+policy decisions.  The libgeopmpolicy library is used by a resource
+manager to set energy policy control parameters for MPI jobs.  Some
+features of libgeopmpolicy are available through the geopmpolicy
+application including support for static control.
+
+## INTEGRATION WITH PMPI
+
+Linking to libgeopm will define symbols that intercept the MPI
+interface through PMPI.  This can be disabled with the configure time
+option `--disable-pmpi`, but is enabled by default.  See
+`LD_DYNAMIC_WEAK` environment variable description below for the
+runtime requirements of the PMPI design.  When using the geopm PMPI
+interposition other profilers which use the same method will be in
+conflict.  The geopm runtime can create a application performance
+profile report and a trace of the application runtime.  As such, geopm
+serves the role of an application profiler in addition to management
+of power resources.  The report and trace generation are controlled by
+the environment variables `GEOPM_REPORT` and `GEOPM_TRACE`, see
+description below.
+
+## LAUNCHING THE RUNTIME
+There are many ways to launch the geopm runtime programatically (see
+**geopm_ctl_c(3)**), or by command line (see
+**geopmctl(1)**). Alternatively the PMPI interposition by geopm
+enables the geopm runtime to be launched implicitly by the MPI
+runtime.  This launch method is enabled by the `GEOPM_PMPI_CTL`
+environment variable documented below.  The PMPI method for launching
+the geopm runtime is a simple way to get started using geopm and is
+recommended for first time users.
+
+## INTERPRETING THE REPORT
+If the `GEOPM_REPORT` environment variable is set then a report will
+be generated.  In the current implementation there is a separate
+report file for each compute node.  These report files give
+information about runtime and energy use for each region marked in the
+code.  Additionally time spent in calls to MPI is reported.  In the
+future the report will be aggregated to a single file and may contain
+more data describing the application.
+
+It is important to note that per-region accounting in the report
+includes only time spent in the region by all MPI ranks concurrently
+on each compute node.  During the time when two ranks on a compute
+node are not in the same marked region, the data collected is
+attributed to code not marked to be within a region.  See the
+`GEOPM_REGION_BARRIER` environment variable for more information about
+debugging issues related region synchronicity.  In the future the
+scope of this requirement may change from all ranks on a node to all
+ranks running within the same domain of control.
+
+## INTERPRETING THE TRACE
+If the `GEOPM_TRACE` environment variable is set (see below) then a
+trace file with time ordered information about the application runtime
+is generated.  A separate trace file is generated for each compute
+node and each file is a pipe (the `|` character) delimited ASCII
+table. The first row of the file gives a description of each field.  A
+simple method for selecting fields from the trace file is with the
+`awk` command:
+
+    $ awk -F\| '{print $1, $2, $11}' < geopm_trace-host0
+
+will print a subset of the fields in the trace file called
+"geopm_trace-host0".
+
+## ENVIRONMENT
+
+  * `LD_DYNAMIC_WEAK`:
+    When dynamically linking an application to libgeopm for any
+    features supported by the PMPI profiling of the MPI runtime it may
+    be required that the LD_DYNAMIC_WEAK environment variable be set
+    at runtime as is documented in the **ld.so(8)** man page.  When
+    dynamically linking an application, if care is taken to link the
+    libgeopm library before linking the library providing the weak MPI
+    symbols, e.g. "-lgeopm -lmpi", linking order precedence will
+    enforce the required override of the MPI interface symbols and the
+    LD_DYNAMIC_WEAK environment variable is not required at runtime.
+
+  * `GEOPM_REPORT`:
+    If set then a report will be generated by the controller when it
+    is destroyed.  The value of the variable determines the name of
+    file generated.  The report contains a summary of performance and
+    power aggregated over the program execution time and split out by
+    each region.
+
+  * `GEOPM_REPORT_VERBOSITY`:
+    Determines the level of detail included in the report.  Currently
+    this feature is not supported and a single report file is
+    generated for each compute node.  In the future the information
+    from all nodes will be aggregated into a single report file and
+    the verbosity level determines how much the per node data is
+    retained in the report.
+
+  * `GEOPM_TRACE`:
+    Enables geopm tracing capability.  Setting this variable enables
+    the creation of a trace output file. The value of the variable is
+    used as the base of the output trace file path.  Currently one
+    trace file is generated per compute node.  The file names of each
+    trace are constructed by appending the node's hostname to base
+    name given by the environment variable (separated by a '-').
+
+  * `GEOPM_SHMKEY`:
+    Override the default shared memory key base.  The shared memory
+    key base prefixes all shared memory keys used by geopm to
+    communicate between the compute application and the geopm runtime.
+    The default key base is '/geopm-shm', this can be overridden by
+    the environment variable.  The base key is extended for each
+    shared memory region used by the runtime.  These keys should be
+    cleaned up by the exception handler in case of an error or OS
+    signal other than SIGKILL.  If the application is killed with
+    SIGKILL or the keys are left behind for any other reason, a simple
+    command to clean up after an aborted job is:
+
+    `$ test -n "$GEOPM_SHMKEY" && rm -f /dev/shm${GEOPM_SHMKEY}* || rm -f /dev/shm/geopm-shm*`
+
+  * `GEOPM_POLICY`:
+    Defines the default policy. The value is either a shared memory
+    key or json file path.  This environment variable must be set when
+    launching the geopm controller through the PMPI interface (see
+    GEOPM_PMPI_CTL environment variable below).  A shared memory key
+    must begin with the '/' character and have no other occurrence of
+    the '/' character.  All other values are assumed to refer to a
+    json file path.  When using a shared memory policy the resource
+    manager creates the shared memory region and dynamically controls
+    the global policy by modifying the region at runtime.
+
+  * `GEOPM_PMPI_CTL`:
+    When set to 'process' or 'pthread' this environment variable
+    enables the launch of the geopm controller through the PMPI
+    wrappers: in particular the wrappers for MPI_Init() or
+    MPI_Init_thread().  In the case of specifying 'process' the
+    controller will run as separate processes on a split off
+    communicator comprised of the lowest rank on each node.
+    Additionally through interception with the PMPI wrappers, the
+    application MPI_COMM_WORLD appears to have one fewer rank per node
+    than was allocated to the job.  In the case of specifying
+    'pthread' the lowest rank on each node will launch a pthread
+    running the controller.  The pthread launch mechanism requires an
+    MPI runtime that can support MPI_THREAD_MULTIPLE.  Support for
+    this feature may require the LD_DYNAMIC_WEAK variable as
+    documented above.
+
+  * `GEOPM_PROFILE`:
+    If set, will enable geopm profiling.  Only required when running
+    the controller with the geopmctl application and no report or
+    trace is being generated.  If `GEOPM_REPORT`, or `GEOPM_TRACE` are
+    set then geopm profiling will be enabled.  Also if
+    `GEOPM_PMPI_CTL` is set to "process" or "pthread" geopm profiling
+    will be enabled.
+
+  * `GEOPM_PLUGIN_PATH`:
+    The search path for geopm plugins.  It is a colon-separated list
+    of directories used by geopm to search for shared objects which
+    contain geopm plugins.  A zero-length directory name indicates the
+    current working directory.  A zero-length directory is inferred by
+    a leading or trailing colon or two adjacent colons.  The default
+    search location is always searched and is determined at library
+    configuration time and by way of the 'pkglib' variable (typically
+    /usr/lib64/geopm/).
+
+  * `GEOPM_DEBUG_ATTACH`:
+    Enables a serial debugger such as gdb to attach to a job when the
+    geopm PMPI wrappers are enabled.  If set to a numerical value the
+    associated rank will be trapped in MPI_Init() until a debugger is
+    attached and the local variable "cont" is set to a non-zero value.
+    If set, but not to a numerical value then all ranks are trapped.
+    The runtime will print a message explaining the hostname and
+    process ID that the debugger should attach to.
+
+  * `GEOPM_REGION_BARRIER`:
+    Enables a node local MPI_Barrier() at time of calling
+    `geopm_region_enter`() or `geopm_region_exit`() for all
+    application ranks that share a node.  Since the geopm controller
+    only considers a region to be entered when all ranks on a node
+    have entered the region, enabling this feature forces control
+    throughout all of the time every rank spends in a region.  This
+    feature is primarily used for debugging purposes.  WARNING: If all
+    regions marked in the application are not entered synchronously by
+    all ranks on a node then enabling this feature will cause a
+    deadlock and the application will hang.
+
+  * `GEOPM_ERROR_AFFINITY_IGNORE`:
+    If set, errors of the type GEOPM_ERROR_AFFINITY are ignored by
+    geopm.  This is useful for testing on systems where CPU affinity
+    requirements cannot be met (e.g. Mac OS X). See **geopm_error(3)**
+    for more information on this error condition.  Note that this is
+    only useful for testing some parts of the GEOPM runtime.  The full
+    geopm runtime will not function at all in a multi-node setting
+    with this environment variable set.
+
+## COPYRIGHT
+Copyright (C) 2015, 2016, 2017, Intel Corporation. All rights reserved.
+
+## SEE ALSO
+**geopmkey(1)**,
+**geopm_ctl_c(3)**,
+**geopm_error(3)**,
+**geopm_fortran(3)**,
+**geopm_omp(3)**,
+**geopm_policy_c(3)**,
+**geopm_prof_c(3)**,
+**geopm_version(3)**,
+**geopmctl(1)**,
+**geopmpolicy(1)**
+**ld.so(8)**
